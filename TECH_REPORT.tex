@@ -1,0 +1,371 @@
+% ============================================================
+% IRS-Diffu-ISAC Technical Report v1.3 (auto-converted from TECH_REPORT.md)
+% arXiv-ready. Compile: pdflatex TECH_REPORT.tex
+% ============================================================
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,frame=single}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue}
+\title{RIS-Aided Integrated Sensing and Communication Toward Space ISAC: A Physics-Grounded Open-Source Engineering System}
+\author{Conrad Lu\\[2pt] \small School of Information Science and Engineering, Northeastern University, Shenyang, China\\ \small\url{https://github.com/ConradLu2740/IRS-Diffu-ISAC}}
+\date{Version 1.3, August 12, 2026}
+\begin{document}
+\maketitle
+
+\textbf{Conrad Lu} (conrad.lu.2740@gmail.com)
+
+\textit{School of Information Science and Engineering, Northeastern University, Shenyang, China}
+
+\textbf{Version}: v1.5 (2026-09-02) -- companion to the open-source repository.
+\textit{Note: this .tex is a stale auto-conversion and lags the Markdown report. The authoritative current
+version is \textbf{TECH\_REPORT.md v1.11} (2026-09-25), which adds Section 6.7 (flow matching vs diffusion:
+equal-compute comparison with convergence-order certificates, strong-baseline controls, generalization, and a
+certified RIS phase-design bracket) and revises the closed-loop decomposition to 16 seeds.}
+\href{https://github.com/ConradLu2740/IRS-Diffu-ISAC}{https://github.com/ConradLu2740/IRS-Diffu-ISAC}
+
+\textit{v1.4 additions: Rician-fading robustness of the RIS tracking trade-off (Section 6.3); a metric-dependence finding (ROI-object and baseline dependence of headline boosts); the layered \texttt{isac\_sim/} reference library (Section 6.2).}
+\textit{v1.5 additions: the escape route from the far-field angle wall -- two-station trilateration with the existing ground UE (Section 6.4), including a rank-deficiency warning for degenerate UE geometries.}
+
+
+\begin{abstract}
+
+This report describes an open-source, physics-grounded engineering system for RIS-aided Integrated Sensing and Communication (ISAC) extended to space ISAC (ISAC-NTN). It combines real LEO orbit propagation (SGP4), dynamic RIS phase tracking, learning-based sensing, 3D multi-object tracking, and a sensing--communication closed loop, reproducible with one-command scripts (fixed seeds). Results: orbit physics matches real ISS values; RIS frame-by-frame tracking improves power by +89\% (K=1), while reconfiguration-limited tracking (K=8) loses the gain; a sensing-aided closed loop achieves +309\% communication gain (97.6\% of the ideal oracle); wideband HRRP classification reaches 0.80 (5-class); 3D multi-object tracking (10 targets) achieves 0.60 recall. A comparison with classical baselines (2D-CFAR, MUSIC) uncovers two findings: (i) a feature-construction defect -- centroid-relative delays discard absolute target position, collapsing ML localization to a class prior (22.6 m vs 12.1 m 2D RMSE with absolute-range features); (ii) a far-field angle wall -- at ~695 km, the 80 m ROI subtends 0.0066$^\circ$, far below an 8-element ULA resolution (~14$^\circ$), so mono-static cross-range localization is physically unavailable. All numbers are reproducible (torch 2.8.0 reference, fixed seeds). Section 1.2 positions this system against the 2025--2026 ISAC literature, where the combination of diffusion-based point-cloud reconstruction with space ISAC (ISAC-NTN) remains an open niche as of August 2026. v1.4 additionally verifies (Section 6.3) that the RIS reconfiguration-rate trade-off survives per-frame independent Rician fading at K-factors down to 0 dB, and documents a metric-dependence finding: relative boost magnitudes depend on the ROI scatterer object and on the random-phase baseline, so cross-setting comparisons must fix both. v1.5 further demonstrates (Section 6.4) that the angle wall has an escape route already present in the scenario: two-station trilateration with the existing ground UE achieves 0.31 m cross-range RMSE (vs 11.8 m mono-static ML) at default geometry, with a rank-deficiency warning for degenerate UE placements.
+
+\textbf{Keywords}: ISAC, RIS, non-terrestrial networks, LEO satellite, diffusion models, CFAR, MUSIC
+
+
+\end{abstract}
+\section{Introduction}
+
+\subsection{Background and Motivation}
+
+Integrated Sensing and Communication (ISAC) unifies wireless communication and radar-like sensing in a single system and is a key enabler of 6G [1, 2]. Reconfigurable Intelligent Surfaces (RIS) extend coverage and enhance both communication and sensing at low hardware cost [3, 4]. Non-terrestrial networks (NTN), in particular LEO constellations, are being integrated into 5G-Advanced/6G, and combining ISAC with NTN ("space ISAC") is of growing interest for space situational awareness and terrestrial monitoring [5, 6, 7].
+
+Standardization is moving fast: 3GPP completed the Release 19 ISAC channel-modeling study item in May 2025 [17, 21], the Release 20 NR ISAC work item (TR 38.765) is nearing completion with normative specifications expected around 2027 [17], IEEE 802.11bf-2025 (WLAN sensing) was published in 2025 [19], and ITU-R lists ISAC among the six key usage scenarios of IMT-2030 [20]. NTN sensing, however, still has no dedicated 3GPP study/work item as of August 2026 [18, 22], leaving an open window for reproducible space-ISAC implementations.
+
+Most published work remains at the level of analytical studies or link-level simulations with simplified geometry. Mature open-source link/PHY platforms (e.g., Sionna [8], MATLAB 5G/NTN toolboxes) exist but do not combine real orbit dynamics, dynamic RIS optimization, learning-based sensing, and closed-loop demonstration in one system. This report accompanies an engineering system that does; it makes no claim of algorithmic novelty over any single component. Its contributions:
+
+\begin{enumerate}
+\item \textbf{A physics-grounded, reproducible space ISAC pipeline} from real TLE orbit data to closed-loop demo, with one-command verification and CI.
+\item \textbf{Dynamic RIS phase tracking} for LEO overpasses with an explicit quantification of the "reconfiguration rate vs channel coherence time" trade-off.
+\item \textbf{A learning-based sensing layer} (classification + localization on wideband HRRP features) and \textbf{3D multi-object tracking}.
+\item \textbf{A systematic classical-baseline comparison} (2D-CFAR + MUSIC vs ML) on identical test sets, surfacing a feature-construction defect and a quantified far-field angle wall.
+\item \textbf{An SDR data interface} (IQ format + ingest pipeline) easing the transition to hardware.
+\end{enumerate}
+
+\subsection{Related Work and Positioning}
+
+\textbf{RIS-aided ISAC.} RIS has been shown to improve both communication and sensing at low hardware cost [3, 4]. 2025--2026 work has expanded toward new surface architectures (STAR-RIS, beyond-diagonal RIS, transmissive RIS transceivers, movable/multi-functional RIS) and toward near-field extremely-large surfaces; dynamic-RIS topics such as low-overhead beam training [23], 1-bit discrete phase optimization [24], and finite-blocklength sensing--communication trade-offs [25] are being actively studied. Our contribution is complementary: we quantify the "reconfiguration rate vs channel coherence time" trade-off for a fast-moving LEO overpass with an analytical phase-tracking scheme and a segmented-reconfiguration (K) sweep, on top of a real orbit (SGP4) geometry.
+
+\textbf{Generative models for sensing and reconstruction.} Diffusion models have become a mainstream tool in wireless: channel estimation [26], radio-environment-map construction [27], and radar/LiDAR point-cloud generation [28, 29] are active areas, and a comprehensive survey of diffusion models for future networks has recently been submitted to the Proceedings of the IEEE [30]. In ISAC sensing, diffusion-based environment/point-cloud reconstruction from communication signals has started to appear (e.g., noise-sparsity-aware diffusion for ISAC environment reconstruction [31]; conditional diffusion point-cloud imaging for UAV sensing [32, 33]). These works focus on terrestrial/low-altitude scenarios with simplified geometry and do not involve RIS or real orbit dynamics; we differ by combining conditional latent point diffusion with RIS-aided space ISAC and real LEO ephemerides.
+
+\textbf{ISAC-NTN / space ISAC.} Surveys and design principles for ISAC-enabled non-terrestrial networks have recently appeared [22], and LEO-satellite ISAC is moving from conceptual studies to system-level designs [34]. Doppler-robust waveforms (OTFS/AFDM) are the leading candidates discussed for high-dynamics ISAC [35]. To the best of our knowledge -- and confirmed by searches of arXiv and public code repositories as of August 2026 -- no open implementation combines real-orbit geometry, dynamic RIS phase tracking, diffusion-based 3D reconstruction, and a sensing--communication closed loop in one reproducible system; this report documents such a system.
+
+\subsection{Report Organization}
+
+Section 2: system/signal models. Section 3: dynamic RIS tracking and the closed loop. Section 4: wideband sensing and 3D MOT. Section 5: classical baselines and the two findings. Section 6: experiments and reproducibility. Section 7: limitations. Section 8: conclusion.
+
+
+\section{System and Signal Model}
+
+\subsection{Scenario Geometry}
+
+A LEO satellite acts as the base station (BS), performs mono-static sensing of a ground region of interest (ROI), and serves a ground user equipment (UE) station. An RIS panel can be \textbf{spaceborne} (~10 m) or \textbf{ground} (~1 m, near UE); modes \texttt{none}/\texttt{sat}/\texttt{ground} are compared. Real TLE ephemerides (ISS NORAD 25544, Starlink) are propagated with SGP4 [9]; ECI$\rightarrow$ECEF conversion includes GMST and Earth-rotation velocity corrections. The overpass window is searched over 48 h; frames are sampled at 1 s near window center where elevation > 20$^\circ$.
+
+Defaults: 30 GHz carrier ($\lambda$ = 1 cm); ISS altitude ~420 km; ROI 80 m $\times$ 80 m at (30$^\circ$N, 120$^\circ$E); UE at (30$^\circ$N, 119.5$^\circ$E); BS--ROI slant $\approx$ 695 km; Doppler -611\ldots+611 kHz; SNR 20 dB.
+
+\textbf{Physics verification} (\texttt{verify\_sat.py}): ISS altitude 418.3 km, velocity 7.66 km/s, period 92.9 min, Doppler S-curve, channel equations -- consistent with published values.
+
+\subsection{Signal Model}
+
+Five propagation paths: (1) BS$\rightarrow$ROI direct illumination, (2) ROI$\rightarrow$UE direct scatter, (3) BS$\rightarrow$UE direct leakage, (4) BS$\rightarrow$RIS$\rightarrow$ROI reflected illumination, (5a) BS$\rightarrow$RIS$\rightarrow$UE and (5b) ROI$\rightarrow$RIS$\rightarrow$UE forwarded paths. For voxel scatterers with complex amplitudes a\_i and two-way (bistatic) delays $\tau$\_i, the baseband frequency response is
+
+\begin{equation}
+H(f) = \sum_i a_i \exp(-j2\pi f \tau_i),
+\end{equation}
+
+and the wideband range profile (HRRP) is the inverse FFT of H(f) over K = 512 subcarriers at 1 GHz bandwidth (range resolution $\approx$ 0.15 m), plus AWGN. The ISAR sequence extends this over M = 32 frames while the target rotates, synthesizing cross-range resolution. Two delay conventions are used:
+
+\begin{itemize}
+\item \textbf{centroid-relative} (\texttt{center='centroid'}): delays relative to the voxel centroid -- shape/pose features, position-independent (classic HRRP);
+\item \textbf{ROI-center-relative} (\texttt{center='roi'}): delays retain absolute target position within the ROI (needed for localization); a differential-delay formulation ($\tau$ = 1.1$\cdot$d\_proj/c, combining the 0.1 BS-side and 1.0 UE-side projection coefficients) avoids K-bin wrap-around.
+\end{itemize}
+
+As shown in Section 5, using the centroid-relative convention for localization silently discards position information.
+
+\subsection{RIS Model and Phase Optimization}
+
+The RIS has N unit-modulus phase elements. Phase-aligned configuration maximizes coherent combination of RIS-assisted and direct paths at the UE. Because the satellite moves at ~7.5 km/s, the optimal phase pattern changes over the channel coherence time. We compare:
+
+\begin{itemize}
+\item \textbf{Frame-by-frame tracking} (K=1): recompute phases every frame -- power \textbf{+89.0\%} vs random (seed-fixed, reproducible);
+\item \textbf{Segmented tracking} (K=2/4/8): reconfiguration limited to every K-th frame -- K=2: +60.0\%, K=4: +36.6\%, K=8: \textbf{-41.5\%} (stale phases can even hurt). This quantitatively illustrates the reconfiguration-rate vs coherence-time trade-off. Section 6.3 verifies this qualitative trade-off is robust under per-frame independent Rician fading (K = 10/5/0 dB, 5 seeds each).
+\end{itemize}
+
+\subsection{Target Models}
+
+Ground targets are 16$^3$ voxel templates (5 m voxels; 80 m ROI) with 5 classes: car, UAV, bicycle, pedestrian, train (static building/tank/tower/cubesat templates exist as functions and are pluggable). Each sample is placed at a random position with a random pose (rotation about the vertical axis), modulating the scattering-center distribution. Isotropic scattering is assumed (no RCS angular dependence, polarization, or occlusion modeled).
+
+
+\section{Dynamic RIS Tracking and the Sensing--Communication Closed Loop}
+
+\subsection{Sensing Layer}
+
+\begin{itemize}
+\item \textbf{Diffusion-based 3D reconstruction} (\texttt{train\_sat.py}): conditional latent diffusion (PointVAE encoder + DiT-style denoiser + CFG; architecture follows latent point diffusion [10, 11, 12]) reconstructs the ROI point cloud; evaluated with Chamfer Distance (CD), F-Score, voxel IoU. Training-scale results: CD 0.137 (sat) / 0.169 (ground) vs 0.233 (no RIS).
+\item \textbf{Classification + localization} (\texttt{train\_sensing*.py}): MLP over wideband HRRP (K = 512) outputs 5-class labels and normalized 2D position within the ROI; CPU real-time.
+\end{itemize}
+
+\subsection{Communication Layer and Closed Loop}
+
+Given sensing output, the RIS phase pattern is configured toward the sensed target. Received power comparison (reproducible, seed-fixed): random phase 1.00$\times$, sensing-aided \textbf{+309.4\%}, ideal oracle +319.3\% (closed-loop efficiency \textbf{97.6\%}). Multi-target closed loop: detection 1/2 in the current 5-class setting, RIS pointing gain \textbf{+443.8\%} (93\% of oracle). A robustness observation: even when classification is wrong, coarse localization captures most of the communication gain.
+
+\subsection{Closed-Loop Demo}
+
+The pipeline is packaged as \texttt{run\_demo.sh} plus a single-file HTML player and GIF animation; a Colab notebook gives a 60-second zero-setup experience.
+
+\textit{Interactive demos (HTML player, GIF, Colab) are companion repository content and are not part of this arXiv submission; static snapshots are available in the repository README.}
+
+
+\section{Wideband/ISAR Sensing and 3D Multi-Object Tracking}
+
+\subsection{Narrowband $\rightarrow$ Wideband $\rightarrow$ ISAR}
+
+Classification accuracy progression (early experiments, 6-class templates; reported for reference): narrowband 0.383 $\rightarrow$ wideband HRRP 0.867 $\rightarrow$ ISAR sequence 0.933. With the current 5-class templates, wideband HRRP classification is \textbf{0.80} (reproducible, \texttt{train\_sensing.py --wideband}, seed-fixed). The progression quantifies the information added by range resolution and by synthetic aperture over rotation.
+
+\subsection{3D Multi-Object Tracking (MOT)}
+
+\begin{itemize}
+\item \textbf{Scene data} (\texttt{mot\_data.py}): 10 moving targets of 5 classes (car, drone, bicycle, pedestrian, train), trajectories straight/accelerating/turning, rendered into per-frame 5-path channel data and range profiles with Doppler.
+\item \textbf{Detector} (\texttt{train\_detect.py}): CNN over range profiles $\rightarrow$ (class, position), CPU-trainable.
+\item \textbf{Tracker} (\texttt{mot\_tracker.py}): Hungarian association with constant-velocity prediction, ID maintenance, class majority voting, $\alpha$-$\beta$ smoothing.
+\item \textbf{3D output} (\texttt{demo\_mot\_html.py}): interactive Plotly HTML with full 3D trajectories.
+\end{itemize}
+
+Reproducible results (seed-fixed): detection recall \textbf{0.60} (10 targets), trajectory class accuracy \textbf{0.73}. A physical constraint is enforced: ground targets have z locked to 0 (mono-static range profiles carry weak height information); only aerial targets (drone) have free z.
+
+\subsection{SDR Data Interface}
+
+An IQ format (\texttt{sdr\_io.py}) and ingest pipeline (\texttt{sdr\_ingest.py}) convert time-domain IQ via FFT to range profiles (fidelity \textbf{0.998} vs simulation reference) and feed the sensing layer. Hardware-ready (RTL-SDR/USRP) without changing downstream processing.
+
+
+\section{Classical Baselines and Physical/Engineering Findings}
+
+Classical radar baselines (\texttt{baseline\_classic.py}) evaluated on the same fixed test set (60 samples, SNR 20 dB, seed-fixed):
+
+\begin{itemize}
+\item \textbf{2D-CA-CFAR} (P\_fa = $10^{-4}$, convolution-vectorized; CA-CFAR formulation [13]) on the range--Doppler map (slow-time FFT of the ISAR sequence);
+\item \textbf{1D-CFAR} on the absolute-range profile with regression-calibrated bin$\rightarrow$meters mapping (20-sample calibration set, R$^2$ $\approx$ 0.83);
+\item \textbf{MUSIC} with an 8-element ULA ($\lambda$/2, 64 snapshots) [14]; general radar background per [15].
+\end{itemize}
+
+\textit{Honesty note: MUSIC is validated with synthetically generated point-source snapshots (a$\cdot$s+n) -- it does not share the same signal stream as CFAR/ML; the 0.017$^\circ$ figure verifies algorithmic self-consistency, not end-to-end sensing accuracy.}
+
+\subsection{Results}
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{lllll}
+Method & Detection & LOS RMSE & Cross-range RMSE & Class acc. \\
+\hline
+2D-CFAR (detection) & \textbf{1.000} & -- & -- & -- \\
+1D-CFAR (localization) & -- & \textbf{8.14 m} & -- (no angle info) & -- \\
+MUSIC (ULA-8, synthetic) & -- & -- & -- & DOA MAE \textbf{0.017$^\circ$} \\
+ML (absolute-range) & -- & \textbf{2.27 m} & 11.84 m & 0.733 \\
+ML (absolute-range, cls head) & -- & -- & -- & 0.733 \\
+ML (centroid-relative, old) & -- & -- & 2D RMSE \textbf{22.63 m} & 0.817 \\
+ML (shape, aligned) & -- & -- & 2D RMSE 21.86 m & 0.700 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Finding 1: Feature-Construction Defect}
+
+The original range-profile function computed delays relative to the voxel centroid, silently discarding the target's absolute position. A controlled single-voxel experiment confirmed this: moving the target across the ROI left the range-profile centroid bin \textit{constant}. Consequently, ML localization trained on centroid-relative features collapses to a class-prior estimate: 2D RMSE \textbf{22.63 m} (centroid-relative) and 21.86 m (aligned shape features) vs \textbf{12.06 m} with absolute-range (\texttt{center='roi'}) features -- a ~2$\times$ gap.
+
+\textbf{Fix and verification}: \texttt{compute\_range\_profile} now supports \texttt{center='roi'} (differential delay); \texttt{SatROIDataset} uses it when \texttt{rp\_align=False}. After retraining: classification 0.80, 2D localization RMSE 12.1 m (LOS 2.3 m), and the closed-loop demo is unaffected (+309.4\%, 97.6\% of oracle). Physics verification and module imports remain green.
+
+\subsection{Finding 2: The Far-Field Angle-Resolution Wall}
+
+At ~695 km slant range, 1 m of cross-range offset subtends $\approx$ 8$\times$$10^{-5}$ degrees; the full 80 m ROI subtends $\approx$ 0.0066$^\circ$. An 8-element ULA at $\lambda$/2 has a Rayleigh resolution of $\approx$ 0.886$\cdot$$\lambda$/(Nd) $\approx$ \textbf{12.7$^\circ$} (upper-bound estimate; even a finer reading $\lambda$/D $\approx$ 14.3$^\circ$ is orders of magnitude larger). Therefore mono-static angle information cannot localize targets within the ROI: ML cross-range RMSE $\approx$ 11.8 m reflects exactly this wall (its cross-range output is driven by class priors and training statistics, not observable angles). This is a physical geometry bound, not an implementation artifact -- but it is a bound on \textbf{angle-only mono-static} localization specifically. The dual-station ISAC scenario already contains the escape route: the ground UE is a second range source, and Section 6.4 shows two-station trilateration breaks the wall by more than an order of magnitude.
+
+
+\section{Experiments and Reproducibility}
+
+\subsection{Summary of Quantitative Results (all reproducible, seed-fixed 42)}
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{lll}
+\# & Experiment & Result \\
+\hline
+1 & Orbit physics (ISS) & Altitude 418.3 km / 7.66 km/s / 92.9 min -- matches real values \\
+2 & Overpass Doppler (30 GHz) & -611\ldots+611 kHz S-curve (real LEO order) \\
+3 & RIS frame-by-frame tracking (K=1) & Power \textbf{+89.0\%} vs random phase \\
+4 & RIS segmented tracking & K=2: +60.0\%, K=4: +36.6\%, K=8: \textbf{-41.5\%} (stale phases harmful) \\
+5 & Sensing--comm closed loop (single) & Class 80\%, comm gain \textbf{+309.4\%} (97.6\% of oracle) \\
+6 & Sensing--comm closed loop (multi) & Detection 1/2, RIS gain \textbf{+443.8\%} (93\% of oracle) \\
+7 & Classification (5-class, wideband HRRP) & \textbf{0.80} (early 6-class: 0.383$\rightarrow$0.867$\rightarrow$ISAR 0.933) \\
+8 & 3D MOT & 10 targets / 5 classes, recall \textbf{0.60}, class acc. 0.73 \\
+9 & SDR pipeline & IQ$\rightarrow$FFT$\rightarrow$range profile fidelity \textbf{0.998} \\
+10 & Robustness & ISS / Starlink $\times$ 30 GHz / 28 GHz: all PASS \\
+11 & 2D-CFAR / 1D-CFAR & Detection 100\% (P\_fa=$10^{-4}$), LOS RMSE \textbf{8.14 m} \\
+12 & MUSIC (synthetic) & ULA-8 DOA MAE \textbf{0.017$^\circ$}; far-field angle wall quantified \\
+13 & Feature fix & Localization 2D RMSE 22.63 $\rightarrow$ \textbf{12.06 m}; LOS 2.3 m \\
+14 & K-sweep under Rician fading (K=10/5/0 dB, 5 seeds) & Trade-off qualitative conclusion \textbf{ROBUST}: monotone in K, K=8 harmful at K=10 dB (-12.8\% mean) \\
+15 & Metric-dependence findings & Headline boost +89.0\% (legacy ROI object) vs +148\% (data\_sat ROI object); strong scattering shrinks the \textit{relative} K=8 penalty \\
+16 & Two-station trilateration (default geometry, σ\_ρ=0.15 m) & Cross-range RMSE \textbf{0.31 m} vs mono-static wall 11.84 m (\textbf{~38$\times$}); break-wall budget σ\_ρ < 6.6--8.9 m \\
+17 & Degenerate UE geometry (Δaz=0$^\circ$) & Rank-deficient: cross-range error explodes to 1817 m -- UE must lie outside the BS--target vertical plane \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Reproducibility}
+
+All results are produced by one-command scripts with \textbf{fixed global seeds} (\texttt{torch.manual\_seed} + \texttt{np.random.seed} + \texttt{random.seed} at every entry point). Reference environment: torch 2.8.0, numpy 1.24+, Python 3.9; two consecutive runs in the same environment produce identical outputs. ML training numbers correspond to the parameters stated in each section (e.g., baseline\_classic.py default 60 test / 300 train / 30 epochs); the closed-loop demo numbers are produced by \texttt{run\_demo.sh} (train + evaluate in one step), which trains the sensing checkpoint in-place.
+
+\begin{lstlisting}
+cd source_code/isac_sat
+../../.venv/bin/python verify_sat.py            # physics verification (ALL PASS)
+../../.venv/bin/python verify_tracking.py       # RIS tracking trade-off
+../../.venv/bin/python verify_tracking_rician.py # K-sweep under Rician fading (v1.4, Section 6.3)
+../../.venv/bin/python verify_twostation_localization.py  # two-station trilateration (v1.5, Section 6.4)
+../../.venv/bin/python train_sensing.py --wideband  # sensing (class + localization)
+../../.venv/bin/python baseline_classic.py      # CFAR + MUSIC vs ML comparison
+../../.venv/bin/python demo.py --checkpoint ./isac_demo/sensing_best.pth  # closed loop
+../../.venv/bin/python demo_mot.py              # 3D multi-object tracking
+\end{lstlisting}
+
+The companion repository [16] runs a GitHub Actions CI pipeline (import checks, physics smoke tests, SDR fidelity) on every push; a Colab notebook reproduces the core demo in ~60 s.
+
+Since v1.4 the repository also ships \textbf{\texttt{isac\_sim/}}, a layered, pluggable simulation reference library (numpy-only core, no torch required for the classic layers): channels (free-space $\rightarrow$ Rician), waveforms (OFDM), RIS models (continuous / 1-bit / segmented), communication links (QPSK-over-AWGN), sensing (1D CA-CFAR), tracking (nearest-neighbor + CV), and finding modules with analytic bounds (the far-field angle wall of Section 5.3). Every layer carries a physics sanity check wired into CI (\texttt{make smoke-sim}); cross-stack validation against Sionna and MATLAB reference implementations is planned. \texttt{source\_code/isac\_sat} remains the reference application built on top of these layers.
+
+\subsection{Robustness under Rician Fading and Metric-Dependence Notes (v1.4)}
+
+The K-sweep headline values in Sections 2.3 and 6.1 were obtained under ideal free-space channels. To test whether the qualitative conclusion is an artifact of that idealization, we inject \textbf{per-frame independent Rician fading} into every scenario link (per-element power-aligned, same convention as \texttt{isac\_sim/channels/rician.py}):
+
+H'(t) = sqrt(K/(K+1)) $\cdot$ H + sqrt(1/(K+1)) $\cdot$ |H| ⊙ Z(t),  Z ~ CN(0,1)
+
+with E|H'|$^2$ = |H|$^2$ (link budgets unchanged, only time selectivity added), for K-factors {10, 5, 0} dB and 5 seeds each (\texttt{verify\_tracking\_rician.py}, \texttt{make track-rician}). The free-space in-house rerun reproduces the v1.3 reference values exactly.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{lllll}
+Channel setting & K=1 & K=2 & K=4 & K=8 \\
+\hline
+Free space (reference) & +89.0\% & +60.0\% & +36.6\% & -41.5\% \\
+Rician 10 dB & +122 $\pm$ 21 & +82 $\pm$ 10 & +59 $\pm$ 9 & -12.8 $\pm$ 18 \\
+Rician 5 dB & +165 $\pm$ 52 & +104 $\pm$ 26 & +74 $\pm$ 25 & +7 $\pm$ 39 \\
+Rician 0 dB & +215 $\pm$ 91 & +126 $\pm$ 52 & +74 $\pm$ 43 & +39 $\pm$ 59 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Finding 3 (robustness).} The qualitative trade-off survives: the boost decreases monotonically in K in every setting, and per-seed K=8 is always far below K=1. At K = 10 dB the K=8 mean remains negative (-12.8\%), i.e. stale phases still hurt.
+
+\textbf{Finding 4 (metric dependence).} Two caveats when interpreting such headline numbers:
+\begin{enumerate}
+\item \textbf{ROI-object dependence.} The boost is relative to a random-phase baseline, and both numerator and denominator depend on the scatterer object. Replacing the legacy 16$^3$ ROI object with the \texttt{data\_sat.generate\_ground\_roi} object changes the K=1 boost from \textbf{+89.0\% to +148\%} (free space, identical geometry and seeds). Cross-setting comparisons must fix the object; v1.3 values correspond to the legacy object.
+\item \textbf{Baseline-relative metric under strong scattering.} At K = 0 dB the \textit{relative} K=8 penalty shrinks (mean +39\%, std 59\%) because the random-phase baseline power itself fluctuates with fading. The physical statement "stale phases are far worse than per-frame tracking" holds in every seed; the sign of the relative number at large K should not be over-interpreted.
+\end{enumerate}
+
+\subsection{Two-Station Trilateration: Escaping the Angle Wall (v1.5)}
+
+Section 5.3 established that mono-static \textbf{angle-only} cross-range localization is physically unavailable at LEO ranges. The dual-station ISAC scenario, however, already contains a second range source: the ground UE. Two range measurements (BS and UE, each with resolution ρ = c/2B determined by bandwidth and independent of array aperture) intersect on the known ground plane to localize in 2D -- bypassing angle resolution entirely.
+
+\textbf{Geometry (v2, corrected).} The LOS angle γ at the target must be computed from the actual station unit vectors, γ = arccos(û\_BS $\cdot$ û\_UE) -- not from the ground baseline divided by slant range (an early small-angle estimate gave 3.9$^\circ$, wrong by ~35$\times$). In the default pass, the BS sits at 33.7$^\circ$ elevation and the UE is 142.5$^\circ$ away in azimuth (and on the horizon), giving \textbf{γ $\approx$ 131$^\circ$}. A second, independent geometric condition matters: the UE must lie \textbf{outside the BS--target vertical plane}. When the azimuth offset Δaz $\rightarrow$ 0, the two LOS ground projections become parallel, the 2D problem loses rank, and the error explodes regardless of γ (measured 1817 m at σ\_ρ = 0.15 m).
+
+\textbf{Experiment} (\texttt{verify\_twostation\_localization.py}, \texttt{make twostation}): targets uniformly drawn from the 80 m ROI (ground-constrained), Gaussian range noise per station, Gauss--Newton solve, 2000 Monte Carlo runs per cell, swept over σ\_ρ ∈ {0.15, 0.5, 1.5, 5} m $\times$ Δaz ∈ {0$^\circ$, 45$^\circ$, 90$^\circ$, 142$^\circ$} on the real default-pass geometry.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{lllll}
+Δaz (γ) & σ\_ρ = 0.15 m & 0.5 m & 1.5 m & 5 m \\
+\hline
+0$^\circ$ (34$^\circ$, rank-deficient) & 1817 m & 2594 m & 5364 m & 7062 m \\
+45$^\circ$ (54$^\circ$) & 0.25 m & 0.86 m & 2.63 m & 8.66 m \\
+90$^\circ$ (90$^\circ$) & 0.15 m & 0.50 m & 1.51 m & 4.92 m \\
+\textbf{142.5$^\circ$ (131$^\circ$, default)} & \textbf{0.31 m} & 1.03 m & 3.12 m & 10.04 m \\
+\hline
+\end{tabular}
+\end{table}
+
+(cross-range RMSE, i.e. the same axis on which the mono-static wall was measured; first-order theory σ\_ρ/sin γ tracks the linear region within ~1.5$\times$, degrading at σ\_ρ = 5 m where errors exceed the ROI's linear regime.)
+
+\textbf{Finding 5 (escape route + information interpretation).} At the default geometry, two-station trilateration achieves \textbf{0.31 m} cross-range RMSE -- \textbf{~38$\times$ better} than the 11.8 m mono-static ML wall, and the break-the-wall budget is σ\_ρ < 11.84$\cdot$sin γ $\approx$ \textbf{6.6--8.9 m} for any non-degenerate UE placement -- i.e. even CFAR-grade ranging suffices. The 11.8 m mono-static result therefore reflects \textbf{unused UE-side information, not missing information}: the correct target problem for future sensing work in this scenario is two-station range-fusion localization (with the BS--UE link dual-use for both communication and ranging), not further refinement of mono-static angle features.
+
+\textit{Honesty notes: ionospheric/atmospheric delay errors are not modeled (they dominate real star--ground ranging); the experiment answers the geometric/information question, not end-to-end accuracy.}
+
+
+\section{Limitations and Honest Discussion}
+
+\begin{enumerate}
+\item \textbf{Absolute attitude estimation is not feasible} in the far-field star--ground setting with simple symmetric templates -- a physical upper bound, not an implementation gap.
+\item \textbf{Single-station multi-target classification is limited} by signal mixing in range profiles (detection/localization remain usable).
+\item \textbf{Cross-range localization is angle-limited} (Section 5.3): mono-static angle-based cross-range localization is physically unavailable at practical array sizes for ~695 km links. Section 6.4 shows the bound is specific to angle-only mono-static processing: two-station trilateration with the existing UE breaks it by ~38$\times$ at CFAR-grade ranging.
+\item \textbf{Target templates are simple voxel models} (isotropic scattering; no RCS angular dependence/polarization); space-debris/satellite geometry models are planned.
+\item \textbf{No over-the-air hardware validation yet}: the SDR interface is verified on simulated IQ; RTL-SDR/USRP capture is the natural next step.
+\item \textbf{Atmosphere/ionosphere effects are not modeled} (free-space far-field approximation).
+\item \textbf{Evaluation scale is modest} (60--150 test samples, smoke-level training, single seed per experiment; multiple seeds and larger runs are a matter of compute). MOT is evaluated on a single scene.
+\item \textbf{Historical values}: some early results (6-class classification progression) were produced before the current 5-class templates; they are reported for reference and are reproducible only from earlier commits.
+\item \textbf{Relative-metric caveats}: RIS boost percentages are relative to a random-phase baseline and depend on the ROI scatterer object (Section 6.3, Finding 4); absolute received-power levels are simulation-calibrated.
+\end{enumerate}
+
+
+\section{Conclusion}
+
+We presented an open-source, physics-grounded space ISAC engineering system -- real LEO orbits, dynamic RIS tracking, learning-based sensing, 3D MOT, closed loop, SDR interface -- with fixed-seed reproducibility and CI verification. Two transferable findings emerge: (i) a feature-construction defect (centroid-relative delays discard absolute position) that we fixed and quantified (~2$\times$ localization gap); (ii) a quantitative far-field angle-resolution wall bounding mono-static cross-range localization. The system serves as a practical testbed for space ISAC research; the honest limitation reporting aims to raise the reproducibility bar in this emerging area. v1.4 adds a robustness verification of the RIS tracking trade-off under Rician fading, a metric-dependence analysis, and a layered \texttt{isac\_sim/} reference library for broader reuse. v1.5 turns the far-field angle wall from a negative result into an actionable one: the scenario's own ground UE breaks the wall as a second range source, defining two-station range-fusion localization as the correct target problem for future sensing work.
+
+
+\section{Acknowledgments}
+
+School research project developed with AI tooling assistance (Proma agent). The repository is maintained at \href{https://github.com/ConradLu2740/IRS-Diffu-ISAC}{https://github.com/ConradLu2740/IRS-Diffu-ISAC} under the MIT license. An independent adversarial review pass (AI reviewer) identified and helped fix reproducibility issues in v1.0.
+
+
+\begin{thebibliography}{35}
+\bibitem{liu2022isac} F. Liu, Y. Cui, C. Masouros, J. Xu, T. X. Han, Y. C. Eldar, and S. Buzzi, ``Integrated sensing and communications: Toward dual-functional wireless networks for 6G and beyond,'' \emph{IEEE J. Sel. Areas Commun.}, vol.~40, no.~6, pp. 1728--1767, 2022.
+\bibitem{zhang2021perceptive} A. Zhang, M. L. Rahman, X. Huang, Y. J. Guo, S. Chen, and R. W. Heath, ``Perceptive mobile networks: Cellular networks with radio vision via joint communication and radar sensing,'' \emph{IEEE Veh. Technol. Mag.}, vol.~16, no.~2, pp. 20--30, 2021.
+\bibitem{wu2019ris} Q. Wu and R. Zhang, ``Intelligent reflecting surface enhanced wireless network via joint active and passive beamforming,'' \emph{IEEE Trans. Wireless Commun.}, vol.~18, no.~11, pp. 5394--5409, 2019.
+\bibitem{huang2019ris} C. Huang, A. Zappone, G. C. Alexandropoulos, M. Debbah, and C. Yuen, ``Reconfigurable intelligent surfaces for energy efficiency in wireless communication,'' \emph{IEEE Trans. Wireless Commun.}, vol.~18, no.~8, pp. 4157--4170, 2019.
+\bibitem{3gppntn} 3GPP, ``Solutions for NR to support non-terrestrial networks (NTN),'' TR 38.821, Release 16, 2020.
+\bibitem{wymeersch2021} H. Wymeersch \emph{et al.}, ``Integration of communication and sensing in 6G: A joint industrial and academic perspective,'' in \emph{Proc. IEEE PIMRC}, 2021.
+\bibitem{3gppisac} 3GPP, ``Study on integrated sensing and communication,'' TR 22.837, Release 19, 2023.
+\bibitem{sionna2022} J. Hoydis, S. Cammerer, F. Ait Aoudia, A. Vem, N. Binder, G. Marcus, and A. Keller, ``Sionna: An open-source, GPU-accelerated library for simulation of wireless systems,'' in \emph{Proc. IEEE SPAWC}, 2022.
+\bibitem{hoots1980} F. R. Hoots and R. L. Roehrich, ``Spacetrack report no. 3: Models for propagation of NORAD element sets,'' U.S. Air Force Aerospace Defense Command, 1980.
+\bibitem{lion2022} Y. Luo \emph{et al.}, ``LION: Latent point diffusion models for 3D shape generation,'' \emph{NeurIPS}, 2022.
+\bibitem{pvd2021} Z. Lyu \emph{et al.}, ``PVD: Point-voxel diffusion for 3D generative modeling,'' \emph{ICCV}, 2021.
+\bibitem{pointe2022} A. Nichol, H. Jun, P. Dhariwal, P. Mishkin, and M. Chen, ``Point-E: A system for generating 3D point clouds from complex prompts,'' \emph{arXiv:2212.08751}, 2022.
+\bibitem{rohling1983} H. Rohling, ``Radar CFAR thresholding in clutter and multiple-target situations,'' \emph{IEEE Trans. Aerosp. Electron. Syst.}, vol.~AES-19, no.~4, pp. 608--621, 1983.
+\bibitem{schmidt1986} R. Schmidt, ``Multiple emitter location and signal parameter estimation,'' \emph{IEEE Trans. Antennas Propag.}, vol.~34, no.~3, pp. 276--280, 1986.
+\bibitem{skolnik2001} M. I. Skolnik, \emph{Introduction to Radar Systems}, 3rd ed., McGraw-Hill, 2001.
+\bibitem{irsdiffu} C. Z. Lu, ``IRS-Diffu-ISAC: RIS-aided ISAC via diffusion models for 3D point cloud reconstruction,'' GitHub repository, 2026, \url{https://github.com/ConradLu2740/IRS-Diffu-ISAC}.
+\bibitem{3gppisacrel20} 3GPP, ``Study on NR integrated sensing and communication,'' TR 38.765, Release 20, 2026.
+\bibitem{3gppisacrel19} 3GPP, ``Service requirements for integrated sensing and communication,'' TS 22.137, Release 19, 2025.
+\bibitem{ieee80211bf} IEEE, ``IEEE Standard for Information Technology---Wireless LAN Medium Access Control (MAC) and Physical Layer (PHY) Specifications---Amendment: WLAN Sensing,'' IEEE 802.11bf-2025, 2025.
+\bibitem{iturm2160} ITU-R, ``IMT-2030 framework: Overall objectives of the future development of IMT for 2030 and beyond,'' Recommendation ITU-R M.2160-0, 2023.
+\bibitem{liu2025rel19isac} Y. Liu, Y. Zhang, J. Zhang, Y. Pei, C. Zhao, S. Luo, \emph{et al.}, ``A comprehensive survey of 3GPP Release 19 ISAC channel modeling: From empirical features to unified methodology and standardized simulator,'' arXiv:2512.03506, 2025.
+\bibitem{jamshed2026ntn} M. A. Jamshed, R. Singh, M. M. Saad, \emph{et al.}, ``ISAC-enabled non-terrestrial networks for 6G: Design principles, standardization, performance tradeoffs, and use cases,'' arXiv:2604.11593, 2026.
+\bibitem{yang2026beam} J. Yang, H. Lee, and J. Choi, ``Beam training for RIS-aided ISAC systems,'' arXiv:2607.24003, 2026.
+\bibitem{gkekas2026binary} A. Gkekas, A. I. Papadopoulos, P. A. Pantazopoulos, A. Lalas, K. Votis, C. Liaskos, ``Geometry-informed optimization of binary RIS configurations for communication and sensing,'' arXiv:2608.04133, 2026.
+\bibitem{umra2025block} A. Umra, K. Weinberger, A. Khaleel, G. Enzner, and A. Sezgin, ``Short blocks, fast sensing: Finite blocklength tradeoffs in RIS-assisted ISAC,'' arXiv:2511.02673, 2025.
+\bibitem{isaccedm2025} M. Farzanullah, H. Zhang, A. B. Sediq, A. Afana, and M. Erol-Kantarci, ``Conditional denoising diffusion for ISAC enhanced channel estimation in cell-free 6G,'' arXiv:2506.06942, 2025 (IEEE PIMRC).
+\bibitem{radiodiff2026} X. Wang, Z. Fang, N. Cheng, \emph{et al.}, ``RadioDiff-Inverse: Diffusion-enhanced Bayesian inverse estimation for ISAC radio map construction,'' \emph{IEEE Trans. Wireless Commun.}, 2026.
+\bibitem{rald2025} R. Zhang, B. Zeng, S. Wang, F. Zhou, and W. Wang, ``RaLD: Generating high-resolution 3D radar point clouds with latent diffusion,'' arXiv:2511.07067, 2025.
+\bibitem{raddiff2025} J. Kwok, H. Caesar, and A. Palffy, ``4D-RaDiff: Latent diffusion for 4D radar point cloud generation,'' arXiv:2512.14235, 2025.
+\bibitem{diffsurv2025} N. C. Luong, N. D. Hai, D. V. Le, H. T. Nguyen, T.-H. Vu, T. Huynh-The, \emph{et al.}, ``Diffusion models for future networks and communications: A comprehensive survey,'' arXiv:2508.01586, 2025 (submitted to Proceedings of the IEEE).
+\bibitem{nsadm2025} N. D. M. Quang, C. Liu, S. Li, \emph{et al.}, ``Diffusion model-enhanced environment reconstruction in ISAC,'' arXiv:2511.19044, 2025 (submitted to IEEE Wireless Communications Letters).
+\bibitem{dai2026pcimg} X. Dai, Y. Gao, H. Jiang, X. Yuan, and X. Wang, ``Conditional diffusion-based point cloud imaging for UAV position and attitude sensing,'' arXiv:2603.29822, 2026.
+\bibitem{dai2026august} X. Dai, Y. Gao, H. Jiang, X. Yuan, and X. Wang, ``Conditional generative learning enabled wireless UAV sensing and tracking via point cloud imaging,'' arXiv:2607.14778, 2026.
+\bibitem{yang2026leoisac} H. Yang, X. Chen, and Q. Wang, ``Robust design of integrated sensing and communication in LEO satellite systems,'' arXiv:2607.12337, 2026.
+\bibitem{mimo2026limits} P.-C. Chen, M.-C. Lee, and Y.-C. Huang, ``Fundamental limits of MIMO-OTFS and MIMO-OFDM in high-dynamics ISAC: An antenna array architecture perspective,'' arXiv:2607.20200, 2026.
+\end{thebibliography}
+
+\end{document}

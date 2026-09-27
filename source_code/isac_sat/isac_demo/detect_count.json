@@ -1,0 +1,23 @@
+{
+  "count_acc": 0.49166666666666664,
+  "p_at_recall_topk": 0.6101949025487257,
+  "p_at_recall_thr": 0.5991902834008097,
+  "mot": {
+    "baseline": {
+      "rmse": 0.2010171436569044,
+      "recall": 0.6993055555555556,
+      "idsw": 178.0
+    },
+    "new_model": {
+      "rmse": 0.18994444879799968,
+      "recall": 0.7590277777777779,
+      "idsw": 192.0
+    }
+  },
+  "verdicts": {
+    "D3a_count_acc_ge_080": false,
+    "D3b_precision_gain_ge_005": false,
+    "D3c_mot_recall_ge_058": true,
+    "D3c2_idsw_le_080x": false
+  }
+}
