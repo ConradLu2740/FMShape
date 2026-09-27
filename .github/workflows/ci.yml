@@ -20,6 +20,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest
 
       - name: Module import check (isac_sat + legacy)
         run: |
@@ -49,6 +50,19 @@ jobs:
           cd source_code/isac_sat
           python verify_sat.py 2>&1 | tail -3
           python verify_sat.py | grep -q "ALL PASS" && echo "PHYSICS OK"
+
+      - name: Pytest suite (tests/)
+        run: pytest tests/ -q
+
+      - name: Headline verification (CPU-safe certificate scripts, no GPU / no training)
+        timeout-minutes: 20
+        run: |
+          cd source_code/isac_sat
+          timeout 600 python verify_p1_gates.py --n_seeds 6
+          timeout 600 python verify_tracking_dp.py --n_seeds 8
+          timeout 600 python verify_isac_pareto.py
+          timeout 600 python verify_ris_sdr_certificate.py --n_seeds 4
+          timeout 900 python verify_waveform_doppler.py
 
       - name: isac_sim layered smoke (channel / waveform / RIS / comm / sensing / tracking)
         run: python tests/test_smoke_isac_sim.py

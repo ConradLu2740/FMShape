@@ -1,8 +1,8 @@
 # RIS-Aided Integrated Sensing and Communication Toward Space ISAC: A Physics-Grounded Open-Source Engineering System
 
-**Conrad Lu** (conrad.lu.2740@gmail.com)
+**[Author]** ([contact email])
 
-*School of Information Science and Engineering, Northeastern University, Shenyang, China*
+*[Affiliation]*
 
 **Version**: v1.51 (2026-09-26) — companion to the open-source repository
 [https://github.com/ConradLu2740/IRS-Diffu-ISAC](https://github.com/ConradLu2740/IRS-Diffu-ISAC)
@@ -375,10 +375,12 @@ batch, reference = midpoint NFE=2000):
 
 | Claim | Theory | Measured |
 |---|---|---|
-| Euler convergence order | err ~ NFE^−1 | slope **−0.87** (sat), −0.78 (none), −0.85 (ground) |
+| Euler convergence order | err ~ NFE^−1 | slope **−0.89** (sat), −0.78 (none), −0.85 (ground) |
 | Midpoint convergence order | err ~ NFE^−2 | −1.11 (sat; floor-limited at large NFE) |
 | Trajectory straightness (curvature proxy) | FM << DDPM | ratio **0.006** (sat), 0.007 (none), 0.006 (ground) |
 | Equal-quality crossover | FM NFE* ≤ DDPM T=100 | NFE* ≤ 2 (sat/none), NFE* = 1 (ground) → **50–100x** fewer network evaluations |
+
+*Euler-order point estimate is batch-sensitive (canonical evidence `verify_fm_bounds.json`: slope_euler = −0.8892 on the 32-cloud batch; −0.87 on the 16-cloud and −0.94 on the 8-cloud batch) — order robust, point estimate batch-sensitive.*
 
 **Measured Lipschitz constant of the guided velocity field** (`verify_gen_hardening.py`, Jacobian power
 iteration with central-difference JVP along the trajectory): L_hat = 3.54 (t in [0.02, 0.98]). The Gronwall
@@ -592,7 +594,7 @@ CV, and seed 44 is a globally degraded run (its VAE oracle is 0.0222 vs 0.0146/0
    scale (256 samples, 100 epochs). The defensible statement is **matched-quality
    sampling-efficiency parity**: FM reaches DDPM-100-step quality with 1-10 ODE steps, i.e. 50-100x
    fewer network evaluations at inference.
-2. The sampler-side certificates of Section 6.7 (Euler order -0.87, straightness ratio 0.006,
+2. The sampler-side certificates of Section 6.7 (Euler order -0.89, straightness ratio 0.006,
    crossover NFE<=2) are unaffected: they are properties of ODE integration on a single trained
    model, not of the training comparison.
 3. The generative quality (CD 0.23-0.32) sits 15-20x above the VAE ceiling (0.015), and the

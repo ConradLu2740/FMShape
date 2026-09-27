@@ -70,4 +70,4 @@ This repository originated as a fork of the research line of [`ConradLu2740/IRS-
 
 ## Status
 
-Manuscript in internal review (Zhejiang University of Technology, School of Information Science & Engineering). Simulation-based throughout; measured-data / EM-simulation transfer validation is the identified first item of future work and is stated as such in the manuscript.
+Manuscript in internal review. Simulation-based throughout; measured-data / EM-simulation transfer validation is the identified first item of future work and is stated as such in the manuscript.

@@ -1,13 +1,13 @@
-# 🛰️ IRS-Diffu-ISAC
+# 🛰️ FMShape
 
 [English](README.md) · **简体中文**
 
-[![CI](https://github.com/ConradLu2740/IRS-Diffu-ISAC/actions/workflows/ci.yml/badge.svg)](https://github.com/ConradLu2740/IRS-Diffu-ISAC/actions/workflows/ci.yml)
+[![CI](https://github.com/ConradLu2740/FMShape/actions/workflows/ci.yml/badge.svg)](https://github.com/ConradLu2740/FMShape/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/ConradLu2740/IRS-Diffu-ISAC)](https://github.com/ConradLu2740/IRS-Diffu-ISAC/releases)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ConradLu2740/IRS-Diffu-ISAC/blob/main/colab/isac_demo.ipynb)
+[![Release](https://img.shields.io/github/v/release/ConradLu2740/FMShape)](https://github.com/ConradLu2740/FMShape/releases)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ConradLu2740/FMShape/blob/main/colab/isac_demo.ipynb)
 
 **一个带证书的 RIS 辅助星地 ISAC 试验台 —— 每条结论都附带它的证明、它的界、或它对公众的证伪。**
 
@@ -46,6 +46,7 @@
 ```bash
 make setup    # 约 2-3 分钟，仅首次
 make verify   # 1 分钟物理自检（ALL PASS）
+make verify-headline  # 头条验证：CPU 安全证书脚本集合（~2-3 分钟）
 make demo     # 自动训练 + 感知-通信闭环
 ```
 
@@ -80,7 +81,7 @@ make smoke-sim
 
 ## 🚀 60 秒体验（零配置）
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ConradLu2740/IRS-Diffu-ISAC/blob/main/colab/isac_demo.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ConradLu2740/FMShape/blob/main/colab/isac_demo.ipynb)
 
 点击上方按钮在 **Google Colab** 一键体验：克隆仓库 → 装依赖 → 真实卫星轨道验证 → 感知-通信闭环 demo → 生成演示 GIF。无需本地环境。
 
@@ -184,7 +185,7 @@ make smoke-sim
 
 **功能覆盖对比**（与 ISAC / RIS / 扩散 3D 方向的代表性开源项目，2026-08 核实）：
 
-| 能力 | **IRS-Diffu-ISAC** | [5G ISAC 系统级仿真](https://github.com/xds0112/5G_based_System_level_Integrated_Sensing_and_Communication_Simulator) | [ISAC-PLM (802.11ay)](https://github.com/wigig-tools/isac-plm) | [PassiveDOA-ISAC-RIS](https://github.com/chenpengseu/PassiveDOA-ISAC-RIS) | [扩散 3D (PVD)](https://github.com/luost26/diffusion-point-cloud) |
+| 能力 | **FMShape** | [5G ISAC 系统级仿真](https://github.com/xds0112/5G_based_System_level_Integrated_Sensing_and_Communication_Simulator) | [ISAC-PLM (802.11ay)](https://github.com/wigig-tools/isac-plm) | [PassiveDOA-ISAC-RIS](https://github.com/chenpengseu/PassiveDOA-ISAC-RIS) | [扩散 3D (PVD)](https://github.com/luost26/diffusion-point-cloud) |
 |---|---|---|---|---|---|
 | 场景 | **太空 ISAC（LEO/NTN）** | 地面 5G NR | 60 GHz WiGig | 地面 RIS 感知 | 通用 3D 点云 |
 | 语言 / 技术栈 | **Python · PyTorch** | MATLAB | MATLAB | MATLAB | PyTorch |
@@ -203,7 +204,7 @@ make smoke-sim
 
 | 项目 | 公开指标 |
 |---|---|
-| **IRS-Diffu-ISAC** | 宽带 HRRP 分类 **0.80**（5 类）· 闭环通信增益 **+374%**（理想闭环 73.3%）· RIS 跟踪 **+173%**（K=1；坐标上升可达值 +256% = 全局最优的**下界**，认证设计因子区间 [0.73, 0.83]）· MOT 召回 **0.60**（10 目标 / 5 类）· 2D-CFAR 检测 100%、LOS RMSE 8.1 m · 3D 重建 CD 0.137–0.183（无 RIS 时 0.233） |
+| **FMShape** | 宽带 HRRP 分类 **0.80**（5 类）· 闭环通信增益 **+374%**（理想闭环 73.3%）· RIS 跟踪 **+173%**（K=1；坐标上升可达值 +256% = 全局最优的**下界**，认证设计因子区间 [0.73, 0.83]）· MOT 召回 **0.60**（10 目标 / 5 类）· 2D-CFAR 检测 100%、LOS RMSE 8.1 m · 3D 重建 CD 0.137–0.183（无 RIS 时 0.233） |
 | PVD（ShapeNet） | CD ~1.5e-3 @ShapeNet——标准*生成*基准，任务不同（无条件 3D 生成，无信道/ISAC 物理） |
 | ISAC-PLM | 60 GHz 802.11ay 链路级感知 MSE / NMSE（短距 PHY 层） |
 | 5G ISAC 系统级 | 5G NR 系统级仿真（2D-CFAR / MUSIC 感知，蜂窝场景） |
@@ -266,6 +267,9 @@ make setup
 
 # 2. 物理自检：轨道 / 多普勒 / 信道（约 1 分钟）
 make verify
+
+# 2b. 头条验证：CPU 安全证书脚本集合（Pareto / DP 调度 / SDR 括号 / OTFS-AFDM，约 2-3 分钟）
+make verify-headline
 
 # 3. 感知-通信闭环 demo（自动训练感知模型）
 make demo
@@ -348,7 +352,7 @@ bash run_demo.sh                              # 2. 闭环 demo（自动训练）
 ## 📁 项目结构
 
 ```
-IRS-Diffu-ISAC/
+FMShape/
 ├── Makefile                        # 🆕 一键命令入口：make setup / verify / demo / ...
 ├── isac_sim/                       # 🆕 ISAC 分层仿真参考库（核心仅依赖 numpy）
 │   ├── channels/ waveforms/ ris/ comm/ sensing/ tracking/
@@ -403,18 +407,18 @@ IRS-Diffu-ISAC/
 
 ## 🤝 参与贡献
 
-发现 bug？有想法？查看 [CONTRIBUTING.md](CONTRIBUTING.md) 并提交 [Issue](https://github.com/ConradLu2740/IRS-Diffu-ISAC/issues) 或 [PR](https://github.com/ConradLu2740/IRS-Diffu-ISAC/pulls)，欢迎一切贡献！
+发现 bug？有想法？查看 [CONTRIBUTING.md](CONTRIBUTING.md) 并提交 [Issue](https://github.com/ConradLu2740/FMShape/issues) 或 [PR](https://github.com/ConradLu2740/FMShape/pulls)，欢迎一切贡献！
 
 **如果这个项目对你的科研或工程有帮助，点个 ⭐ —— 让更多人看到它！**
 
 ## 引用
 
 ```bibtex
-@misc{irsdiffuisac2026,
-  title  = {IRS-Diffu-ISAC: A Certificate-Carrying Testbed for RIS-Aided Space ISAC},
+@misc{fmshape2026,
+  title  = {FMShape: A Certificate-Carrying Testbed for RIS-Aided Space ISAC},
   author = {Lu, Conrad},
   year   = {2026},
-  howpublished = {\url{https://github.com/ConradLu2740/IRS-Diffu-ISAC}}
+  howpublished = {\url{https://github.com/ConradLu2740/FMShape}}
 }
 ```
 

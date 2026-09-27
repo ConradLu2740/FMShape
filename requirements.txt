@@ -1,4 +1,4 @@
-# IRS-Diffu-ISAC 依赖
+# FMShape 依赖
 # Python 3.9+
 torch>=2.0
 numpy>=1.24

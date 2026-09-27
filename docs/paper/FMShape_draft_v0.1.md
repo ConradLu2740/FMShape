@@ -1,7 +1,7 @@
 # FMShape: Conditional Flow Matching for Target-Shape Reconstruction From High-Resolution Range Profiles in Spaceborne ISAC
 
 > **论文草稿 v0.2**（基于 IRS-Diffu-ISAC 仓库全部实测结果；v0.2 = 英文润色 + venue 定稿）
-> 作者占位：[学生姓名], [张昱], [卢为党] — 浙江工业大学信息工程学院，杭州
+> 作者占位：[作者姓名], [单位名称]
 > **Venue 终判：主投 IEEE TAES**（雷达感知 + 生成式方法主题最契合；备选 IEEE TSP 若加理论权重，或 IoT-J 若需回避“无实测数据”风险）——适配说明见文末
 > 状态：七节正文 + Fig. 1–3 + 19 条参考文献齐备；待作者/基金信息、内部评审、终稿润色
 

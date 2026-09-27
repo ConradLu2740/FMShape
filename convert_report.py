@@ -89,7 +89,7 @@ PRE = r"""% ============================================================
 \lstset{basicstyle=\ttfamily\small,breaklines=true,frame=single}
 \hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue}
 \title{RIS-Aided Integrated Sensing and Communication Toward Space ISAC: A Physics-Grounded Open-Source Engineering System}
-\author{Conrad Lu\\[2pt] \small School of Information Science and Engineering, Northeastern University, Shenyang, China\\ \small\url{https://github.com/ConradLu2740/IRS-Diffu-ISAC}}
+\author{[Author]\\[2pt] \small [Affiliation]\\ \small\url{https://github.com/ConradLu2740/FMShape}}
 \date{Version 1.3, August 12, 2026}
 \begin{document}
 \maketitle"""
@@ -110,7 +110,7 @@ BIB = r"""\begin{thebibliography}{35}
 \bibitem{rohling1983} H. Rohling, ``Radar CFAR thresholding in clutter and multiple-target situations,'' \emph{IEEE Trans. Aerosp. Electron. Syst.}, vol.~AES-19, no.~4, pp. 608--621, 1983.
 \bibitem{schmidt1986} R. Schmidt, ``Multiple emitter location and signal parameter estimation,'' \emph{IEEE Trans. Antennas Propag.}, vol.~34, no.~3, pp. 276--280, 1986.
 \bibitem{skolnik2001} M. I. Skolnik, \emph{Introduction to Radar Systems}, 3rd ed., McGraw-Hill, 2001.
-\bibitem{irsdiffu} C. Z. Lu, ``IRS-Diffu-ISAC: RIS-aided ISAC via diffusion models for 3D point cloud reconstruction,'' GitHub repository, 2026, \url{https://github.com/ConradLu2740/IRS-Diffu-ISAC}.
+\bibitem{irsdiffu} C. Z. Lu, ``IRS-Diffu-ISAC: RIS-aided ISAC via diffusion models for 3D point cloud reconstruction,'' GitHub repository, 2026, \url{https://github.com/ConradLu2740/FMShape}.
 \bibitem{3gppisacrel20} 3GPP, ``Study on NR integrated sensing and communication,'' TR 38.765, Release 20, 2026.
 \bibitem{3gppisacrel19} 3GPP, ``Service requirements for integrated sensing and communication,'' TS 22.137, Release 19, 2025.
 \bibitem{ieee80211bf} IEEE, ``IEEE Standard for Information Technology---Wireless LAN Medium Access Control (MAC) and Physical Layer (PHY) Specifications---Amendment: WLAN Sensing,'' IEEE 802.11bf-2025, 2025.
