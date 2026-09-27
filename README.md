@@ -26,9 +26,10 @@ One reproducible testbed, six layers — everything below is fixed-seed and one-
 ## Quickstart
 
 ```bash
-make setup        # environment
+make setup        # environment (creates .venv, installs requirements; Windows & Linux)
 make demo         # auto-train + sensing–communication closed loop
-make verify       # full verification suite (each headline number: certified, bracketed, or falsified)
+make verify       # physics smoke suite
+make verify-headline   # headline certificates on CPU (5 scripts, ~3 min: Pareto, SDR bracket, DP scheduling, gates, Doppler/ICI)
 ```
 
 Key verification targets: `verify-fm-bounds` (ODE order / straightness / crossover), `verify-gen-metrics` / `verify-gen-metrics-n32` (distributional fidelity), `verify-fm-train-scale-paired` / `verify-m3-paired` (paired scaling sweeps), `verify-headline-multiseed` (3-seed paired A/B), `verify-fm-shape` (closed-loop deployment).
