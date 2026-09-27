@@ -424,4 +424,4 @@ FMShape/
 
 ## License
 
-[MIT](LICENSE) © 2026 Conrad Lu
+[MIT](LICENSE) © 2026 The FMShape Authors

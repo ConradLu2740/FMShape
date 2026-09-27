@@ -15,7 +15,7 @@ description = "RIS-aided ISAC: diffusion 3D reconstruction, space ISAC (LEO), dy
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "Conrad Lu" }]
+authors = [{ name = "The FMShape Authors" }]
 keywords = ["isac", "ris", "reconfigurable-intelligent-surface", "diffusion-model", "point-cloud", "satellite", "leo", "sensing", "communication", "6g"]
 classifiers = [
     "Programming Language :: Python :: 3",
